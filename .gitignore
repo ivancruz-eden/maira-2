@@ -1,0 +1,155 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.pyc
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+*.manifest
+*.spec
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+env/
+.virtualenv/
+
+# UV package manager
+.uv/
+uv.lock
+
+# Model weights and cache
+models/
+.cache/
+huggingface/
+transformers_cache/
+torch_cache/
+*.pt
+*.pth
+*.bin
+*.safetensors
+*.ckpt
+*.h5
+*.onnx
+
+# Data and media files
+data/
+datasets/
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+*.tiff
+*.dcm
+*.dicom
+*.nii
+*.nii.gz
+
+# Test outputs
+output/
+output_*.txt
+output_*.png
+results/
+predictions/
+*.csv
+*.json
+
+# IDE and editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+*~
+.project
+.pydevproject
+.settings/
+*.sublime-project
+*.sublime-workspace
+.vs/
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+**/.ipynb_checkpoints/
+
+# Testing
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+.hypothesis/
+
+# MyPy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre
+.pyre/
+
+# pytype
+.pytype/
+
+# Logs and databases
+logs/
+*.log
+*.sql
+*.sqlite
+*.db
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Documentation builds
+docs/_build/
+site/
+
+# Backup files
+*.bak
+*.tmp
+*.temp
+
+# Compiled files
+*.com
+*.class
+*.dll
+*.exe
+*.o
+*.so

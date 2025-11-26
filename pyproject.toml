@@ -1,0 +1,25 @@
+[project]
+name = "maira-2-test"
+version = "0.1.0"
+description = "Testing environment for Microsoft MAIRA-2 model"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "pillow>=10.0.0",
+    "protobuf>=4.25.0",
+    "sentencepiece>=0.1.99",
+    "torch>=2.0.0",
+    "transformers>=4.48.0,<4.52",
+    "requests>=2.31.0",
+    "accelerate>=0.20.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ipython>=8.0.0",
+    "jupyter>=1.0.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

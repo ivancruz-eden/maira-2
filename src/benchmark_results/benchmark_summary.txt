@@ -1,0 +1,68 @@
+======================================================================
+MAIRA-2 PERFORMANCE BENCHMARK SUMMARY
+======================================================================
+Timestamp: 2025-11-27T19:32:10.187921
+Model: microsoft/maira-2
+
+----------------------------------------------------------------------
+MODEL SIZE
+----------------------------------------------------------------------
+Total Parameters:      6,880,185,600 (6.88B)
+Trainable Parameters:  6,880,185,600
+Model Size (FP32):     25.63 GB
+Model Size (FP16):     12.82 GB
+Processor Vocab Size:  32,000
+
+----------------------------------------------------------------------
+GPU MEMORY USAGE
+----------------------------------------------------------------------
+Memory After Model Load: 12.82 GB
+Peak Memory (Inference): 12.85 GB
+
+Per-GPU Breakdown:
+  GPU 0 (NVIDIA L4): 3.15 GB allocated / 22.04 GB total
+  GPU 1 (NVIDIA L4): 3.39 GB allocated / 22.04 GB total
+  GPU 2 (NVIDIA L4): 3.39 GB allocated / 22.04 GB total
+  GPU 3 (NVIDIA L4): 2.88 GB allocated / 22.04 GB total
+
+----------------------------------------------------------------------
+INFERENCE PERFORMANCE
+----------------------------------------------------------------------
+Samples Tested:        10
+Warmup Time:           9752.10 ms
+
+Timing Breakdown (averages):
+  Preprocessing:       312.97 ms
+  Generation:          3898.36 ms
+  Post-processing:     0.24 ms
+  Total:               4211.57 ms (±718.27)
+
+Min Inference Time:    3396.02 ms
+Max Inference Time:    5390.48 ms
+
+Tokens/Second:         14.14
+Throughput:            14.25 images/minute
+
+----------------------------------------------------------------------
+PRODUCTION READINESS ASSESSMENT
+----------------------------------------------------------------------
+Memory Efficiency: ✓ Good (14.5% utilization)
+Latency (Interactive): ✓ Acceptable (4.21s)
+Throughput (Batch): ⚠ Moderate (14.2 img/min)
+Consistency: ✓ Stable (CV: 17.1%)
+Multi-GPU Support: ✓ Distributed across 4 GPUs
+
+----------------------------------------------------------------------
+SYSTEM INFORMATION
+----------------------------------------------------------------------
+PyTorch Version:       2.9.1+cu128
+CUDA Version:          12.8
+Number of GPUs:        4
+  GPU 0: NVIDIA L4
+  GPU 1: NVIDIA L4
+  GPU 2: NVIDIA L4
+  GPU 3: NVIDIA L4
+
+======================================================================
+NOTE: This model is for RESEARCH USE ONLY, not for clinical deployment.
+======================================================================

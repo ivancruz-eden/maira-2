@@ -1,0 +1,35 @@
+======================================================================
+MAIRA-2 PERFORMANCE BENCHMARK
+======================================================================
+
+Configuration:
+  Data directory: /home/ivan_cruz_edenmed_com/dev/maira-2/data/first_labeling_studies_june_2025
+  CSV file: merged_june_andres_labeling.csv
+  Images dir: images
+  Samples to test: 5
+  Output directory: /home/ivan_cruz_edenmed_com/dev/maira-2/src/benchmark_results
+  Warmup runs: 1
+  Max tokens: 300
+
+Loading evaluation dataset...
+Loaded 75 samples from dataset
+
+======================================================================
+RUNNING PERFORMANCE BENCHMARK
+======================================================================
+
+======================================================================
+LOADING MAIRA-2 MODEL
+======================================================================
+
+Baseline GPU Memory
+------------------------------------------------------------
+GPU 0 (NVIDIA L4): Allocated: 0.00GB / Reserved: 0.00GB / Total: 22.04GB
+GPU 1 (NVIDIA L4): Allocated: 0.00GB / Reserved: 0.00GB / Total: 22.04GB
+GPU 2 (NVIDIA L4): Allocated: 0.00GB / Reserved: 0.00GB / Total: 22.04GB
+GPU 3 (NVIDIA L4): Allocated: 0.00GB / Reserved: 0.00GB / Total: 22.04GB
+TOTAL: Allocated: 0.00GB / Reserved: 0.00GB
+
+Loading model: microsoft/maira-2
+Detected 4 GPU(s)
+Loading checkpoint shards:   0%|          | 0/6 [00:00<?, ?it/s]Loading checkpoint shards:  17%|█▋        | 1/6 [00:15<01:16, 15.29s/it]

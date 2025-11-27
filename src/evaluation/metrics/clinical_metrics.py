@@ -83,9 +83,26 @@ class RadGraphMetric(MetricCalculator):
             import logging
             logging.getLogger("radgraph").setLevel(logging.ERROR)
             
+            # Determine CUDA device
+            # RadGraph expects: -1 for CPU, 0+ for GPU index
+            if self.device is None:
+                # Auto-detect
+                import torch
+                cuda_device = 0 if torch.cuda.is_available() else -1
+            elif self.device == "cpu":
+                cuda_device = -1
+            elif self.device.startswith("cuda"):
+                # Handle "cuda", "cuda:0", "cuda:1", etc.
+                if ":" in self.device:
+                    cuda_device = int(self.device.split(":")[1])
+                else:
+                    cuda_device = 0
+            else:
+                cuda_device = -1
+            
             self._scorer = F1RadGraph(
                 reward_level=self.reward_level,
-                cuda=self.device if self.device else -1,
+                cuda=cuda_device,
             )
         return self._scorer
     
@@ -97,9 +114,12 @@ class RadGraphMetric(MetricCalculator):
         """
         Compute RadGraph F1 score for predictions vs references.
         
+        Note: RadGraph is designed for English text only. For cross-lingual
+        evaluation, references should be translated to English first.
+        
         Args:
-            predictions: List of generated reports
-            references: List of ground truth reports
+            predictions: List of generated reports (in English)
+            references: List of ground truth reports (in English)
             
         Returns:
             MetricResult with RGER scores
@@ -114,23 +134,15 @@ class RadGraphMetric(MetricCalculator):
         try:
             scorer = self._get_scorer()
             
-            # RadGraph expects specific input format
-            # Compute batch score and individual scores
-            scores = []
-            for pred, ref in zip(predictions, references):
-                try:
-                    # F1RadGraph returns (mean_score, scores_dict, hypothesis_annotations, reference_annotations)
-                    _, score_dict, _, _ = scorer(
-                        hyps=[pred],
-                        refs=[ref],
-                    )
-                    # score_dict contains individual scores
-                    if score_dict and len(score_dict) > 0:
-                        scores.append(float(list(score_dict.values())[0]))
-                    else:
-                        scores.append(0.0)
-                except Exception:
-                    scores.append(0.0)
+            # Compute scores for all pairs at once for efficiency
+            # F1RadGraph returns: (mean_score, scores_list, hyp_annotations, ref_annotations)
+            mean_score, scores_list, _, _ = scorer(
+                hyps=predictions,
+                refs=references,
+            )
+            
+            # scores_list is a list of individual scores
+            scores = [float(s) for s in scores_list]
             
             return MetricResult.from_scores(
                 name=self.name,
@@ -140,6 +152,8 @@ class RadGraphMetric(MetricCalculator):
             
         except Exception as e:
             warnings.warn(f"RadGraph computation failed: {e}")
+            import traceback
+            traceback.print_exc()
             return MetricResult(
                 name=self.name,
                 mean=0.0,

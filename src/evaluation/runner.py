@@ -4,10 +4,17 @@ Evaluation runner for MAIRA-2 radiology report generation.
 This module provides the main evaluation pipeline that:
 1. Loads the dataset
 2. Generates reports using MAIRA-2
-3. Computes evaluation metrics
-4. Outputs results in various formats
+3. Handles translation for cross-lingual evaluation (EN ↔ ES)
+4. Computes evaluation metrics
+5. Outputs results in various formats
+
+For Spanish evaluation datasets:
+- Model predictions (EN) are translated to Spanish for comparison
+- Spanish references are translated to English for CheXbert metrics
 """
 import json
+import sys
+import os
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -18,6 +25,7 @@ import warnings
 from tqdm import tqdm
 
 from .dataset import EvaluationDataset, DatasetItem
+from .dataset_translation import DatasetTranslator, TranslatedDataset
 from .metrics import (
     MetricResult,
     MetricCalculator,
@@ -49,6 +57,13 @@ class EvaluationConfig:
         bertscore_model: Model to use for BERTScore
         device: Device for model inference ('cuda', 'cpu', or None)
         batch_size: Batch size for metric computation
+        
+        # Translation settings
+        source_language: Language of model predictions ('en')
+        target_language: Language of reference reports ('es' for Spanish datasets)
+        enable_translation: Whether to enable translation for cross-lingual evaluation
+        translation_cache_dir: Directory to cache translations
+        save_translations: Whether to save translated texts
     """
     output_dir: str = "./evaluation_results"
     save_predictions: bool = True
@@ -66,6 +81,13 @@ class EvaluationConfig:
     bertscore_model: str = "microsoft/deberta-xlarge-mnli"
     device: Optional[str] = None
     batch_size: int = 32
+    
+    # Translation settings
+    source_language: str = "en"  # Model output language
+    target_language: str = "es"  # Reference report language
+    enable_translation: bool = True  # Enable cross-lingual translation
+    translation_cache_dir: Optional[str] = None  # Cache dir for translations
+    save_translations: bool = True  # Save translated texts to results
 
 
 class EvaluationRunner:
@@ -75,43 +97,76 @@ class EvaluationRunner:
     This class orchestrates the full evaluation pipeline:
     - Loading dataset and model
     - Generating predictions
+    - Translating for cross-lingual evaluation (EN ↔ ES)
     - Computing metrics
     - Saving results
+    
+    For Spanish evaluation datasets:
+    - Model predictions (EN) are compared directly with translated EN references
+    - CheXbert metrics use translated English references
+    - Optionally, predictions are also translated to Spanish
     
     Example:
         ```python
         from evaluation import EvaluationRunner, EvaluationConfig
         from evaluation.dataset import load_evaluation_dataset
         
-        # Load dataset
+        # Load dataset (Spanish references)
         dataset = load_evaluation_dataset("data/evaluation/")
         
-        # Create runner
-        config = EvaluationConfig(output_dir="results/")
+        # Create runner with translation enabled
+        config = EvaluationConfig(
+            output_dir="results/",
+            source_language="en",      # Model outputs in English
+            target_language="es",      # References are in Spanish
+            enable_translation=True,   # Translate for cross-lingual eval
+        )
         runner = EvaluationRunner(config)
         
         # Option 1: Evaluate with MAIRA-2 model
         results = runner.evaluate_with_maira2(dataset)
         
         # Option 2: Evaluate with pre-generated predictions
-        predictions = [...]  # Your generated reports
-        references = dataset.get_all_references()
+        predictions = [...]  # Your generated reports (in English)
+        references = dataset.get_all_references()  # Spanish references
         results = runner.evaluate_predictions(predictions, references)
         ```
     """
     
-    def __init__(self, config: Optional[EvaluationConfig] = None):
+    def __init__(
+        self,
+        config: Optional[EvaluationConfig] = None,
+        translator=None,
+    ):
         """
         Initialize the evaluation runner.
         
         Args:
             config: Evaluation configuration. Uses defaults if not provided.
+            translator: NLLBTranslator instance for cross-lingual evaluation.
+                       Will be created lazily if translation is enabled.
         """
         self.config = config or EvaluationConfig()
+        self._translator = translator
+        self._dataset_translator = None
         self.metrics = self._setup_metrics()
         
         # Create output directory
         Path(self.config.output_dir).mkdir(parents=True, exist_ok=True)
+    
+    def _get_dataset_translator(self) -> DatasetTranslator:
+        """Get or create the dataset translator."""
+        if self._dataset_translator is None:
+            cache_dir = self.config.translation_cache_dir
+            if cache_dir is None:
+                cache_dir = str(Path(self.config.output_dir) / "translation_cache")
+            
+            self._dataset_translator = DatasetTranslator(
+                translator=self._translator,
+                cache_dir=cache_dir,
+                use_cache=True,
+            )
+        return self._dataset_translator
     
     def _setup_metrics(self) -> List[MetricCalculator]:
         """Set up the metric calculators based on config."""
@@ -171,14 +226,21 @@ class EvaluationRunner:
         predictions: List[str],
         references: List[str],
         instance_ids: Optional[List[str]] = None,
+        references_language: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Evaluate pre-generated predictions against references.
         
+        Handles cross-lingual evaluation when predictions (English) and 
+        references (Spanish) are in different languages:
+        - Translates predictions EN → ES for Spanish comparison metrics
+        - Translates references ES → EN for CheXbert metrics (English-only)
+        
         Args:
-            predictions: List of generated reports
-            references: List of ground truth reports
+            predictions: List of generated reports (typically in English)
+            references: List of ground truth reports (may be in Spanish)
             instance_ids: Optional list of sample identifiers
+            references_language: Language of references (overrides config.target_language)
             
         Returns:
             Dictionary containing all evaluation results
@@ -195,6 +257,63 @@ class EvaluationRunner:
         print(f"Samples: {len(predictions)}")
         print(f"Metrics: {len(self.metrics)}")
         
+        # Determine languages
+        pred_lang = self.config.source_language
+        ref_lang = references_language or self.config.target_language
+        cross_lingual = (pred_lang != ref_lang) and self.config.enable_translation
+        
+        if cross_lingual:
+            print(f"\nCross-lingual evaluation:")
+            print(f"  Predictions language: {pred_lang.upper()}")
+            print(f"  References language: {ref_lang.upper()}")
+        
+        # Initialize data containers
+        translated_data = None
+        predictions_for_metrics = predictions
+        references_for_metrics = references
+        references_for_chexbert = references
+        
+        # Handle translation if needed
+        if cross_lingual:
+            print(f"\n{'='*60}")
+            print("TRANSLATION STEP")
+            print(f"{'='*60}")
+            
+            dataset_translator = self._get_dataset_translator()
+            
+            # Translate predictions to target language (EN → ES) for output
+            print("\n1. Translating predictions (EN → ES)...")
+            predictions_translated = dataset_translator.translate_texts(
+                predictions,
+                source_lang=pred_lang,
+                target_lang=ref_lang,
+                show_progress=True,
+            )
+            
+            # Translate references to source language (ES → EN) for CheXbert
+            print("\n2. Translating references (ES → EN) for CheXbert metrics...")
+            references_for_chexbert = dataset_translator.translate_texts(
+                references,
+                source_lang=ref_lang,
+                target_lang=pred_lang,
+                show_progress=True,
+            )
+            
+            # Store translated data
+            translated_data = TranslatedDataset(
+                predictions_en=predictions,
+                predictions_es=predictions_translated,
+                references_es=references,
+                references_en=references_for_chexbert,
+                instance_ids=instance_ids or [str(i) for i in range(len(predictions))],
+            )
+            
+            print(f"\nTranslation complete!")
+        
+        print(f"\n{'='*60}")
+        print("COMPUTING METRICS")
+        print(f"{'='*60}")
+        
         # Compute all metrics
         all_results = []
         
@@ -202,23 +321,42 @@ class EvaluationRunner:
             print(f"\nComputing {metric.name}...")
             
             try:
+                # Determine which data to use for this metric
+                # CheXbert and RadGraph need English text - use translated references
+                if isinstance(metric, (CheXbertMetric, RadGraphMetric)):
+                    metric_predictions = predictions  # Already in English
+                    metric_references = references_for_chexbert  # English translations
+                    if cross_lingual:
+                        print(f"  (Using English-translated references for {metric.name})")
+                else:
+                    # Other metrics use original data
+                    metric_predictions = predictions_for_metrics
+                    metric_references = references_for_metrics
+                
                 if hasattr(metric, 'compute_all'):
                     # Metrics that return multiple results (BERTScore, CheXbert)
-                    results = metric.compute_all(predictions, references)
+                    results = metric.compute_all(metric_predictions, metric_references)
                     all_results.extend(results)
                     for r in results:
                         print(f"  {r}")
                 else:
-                    result = metric.compute(predictions, references)
+                    result = metric.compute(metric_predictions, metric_references)
                     all_results.append(result)
                     print(f"  {result}")
             except Exception as e:
                 warnings.warn(f"Failed to compute {metric.name}: {e}")
+                import traceback
+                traceback.print_exc()
         
         # Build results dictionary
         results_dict = {
             "timestamp": datetime.now().isoformat(),
             "num_samples": len(predictions),
+            "languages": {
+                "predictions": pred_lang,
+                "references": ref_lang,
+                "cross_lingual_evaluation": cross_lingual,
+            },
             "metrics": {},
             "summary": [],
         }
@@ -243,12 +381,29 @@ class EvaluationRunner:
         if self.config.save_predictions:
             results_dict["predictions"] = []
             for i, (pred, ref) in enumerate(zip(predictions, references)):
-                item = {
-                    "prediction": pred,
-                    "reference": ref,
-                }
+                item = {}
+                
+                # Add instance ID first if available
                 if instance_ids:
                     item["instance_id"] = instance_ids[i]
+                
+                # Add predictions with translations
+                item["prediction"] = {
+                    "original": pred,
+                    "language": pred_lang,
+                }
+                if translated_data:
+                    item["prediction"]["translated"] = translated_data.predictions_es[i]
+                    item["prediction"]["translated_language"] = ref_lang
+                
+                # Add references with translations
+                item["reference"] = {
+                    "original": ref,
+                    "language": ref_lang,
+                }
+                if translated_data:
+                    item["reference"]["translated"] = translated_data.references_en[i]
+                    item["reference"]["translated_language"] = pred_lang
                 
                 # Add per-sample scores
                 if self.config.save_per_sample_scores:

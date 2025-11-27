@@ -14,6 +14,10 @@ bert-score>=0.3.13             # For BERTScore metric
 numpy>=1.24.0                  # For numerical operations
 tqdm>=4.65.0                   # For progress bars
 
+# Translation dependencies (NLLB-200)
+# Note: transformers already included above supports NLLB
+# The facebook/nllb-200-distilled-600M model will be downloaded on first use
+
 # Optional: Clinical metrics (may require additional setup)
 # radgraph>=0.1.0              # For RGER metric (requires separate installation)
 # pydicom>=2.3.0               # For loading DICOM files

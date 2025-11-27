@@ -3,17 +3,24 @@
 MAIRA-2 Evaluation Script
 
 This script evaluates the MAIRA-2 non-grounded report generation
-against the evaluation dataset.
+against the evaluation dataset, with support for cross-lingual evaluation.
+
+For Spanish evaluation datasets:
+- Model outputs (English) are translated to Spanish for comparison
+- Spanish references are translated to English for CheXbert metrics
 
 Usage:
-    # Evaluate using MAIRA-2 model
-    python run_evaluation.py --data-dir ../data/first_labeling_studies_june_2025/
+    # Evaluate using MAIRA-2 model (default: Spanish references)
+    python run_evaluation.py --data-dir ../../data/first_labeling_studies_june_2025/
+    
+    # Evaluate with translation disabled (for English references)
+    python run_evaluation.py --data-dir ../../data/evaluation/ --no-translation
     
     # Evaluate with custom output directory
-    python run_evaluation.py --data-dir ../data/first_labeling_studies_june_2025/ --output-dir ./results/
+    python run_evaluation.py --data-dir ../../data/first_labeling_studies_june_2025/ --output-dir ./results/
     
     # Skip certain metrics
-    python run_evaluation.py --data-dir ../data/first_labeling_studies_june_2025/ --no-radgraph
+    python run_evaluation.py --data-dir ../../data/first_labeling_studies_june_2025/ --no-radgraph
 """
 import argparse
 import sys
@@ -38,7 +45,7 @@ def parse_args():
     parser.add_argument(
         "--data-dir",
         type=str,
-        default="../data/first_labeling_studies_june_2025/",
+        default="../../data/first_labeling_studies_june_2025/",
         help="Path to the evaluation data directory"
     )
     parser.add_argument(
@@ -133,6 +140,36 @@ def parse_args():
         help="Maximum number of samples to evaluate (for testing)"
     )
     
+    # Translation arguments
+    parser.add_argument(
+        "--no-translation",
+        action="store_true",
+        help="Disable translation (use when references are in English)"
+    )
+    parser.add_argument(
+        "--source-lang",
+        type=str,
+        default="en",
+        help="Source language of model predictions (default: en)"
+    )
+    parser.add_argument(
+        "--target-lang",
+        type=str,
+        default="es",
+        help="Target language of reference reports (default: es for Spanish)"
+    )
+    parser.add_argument(
+        "--translation-cache-dir",
+        type=str,
+        default=None,
+        help="Directory for caching translations"
+    )
+    parser.add_argument(
+        "--no-save-translations",
+        action="store_true",
+        help="Don't save translated texts to results"
+    )
+    
     return parser.parse_args()
 
 
@@ -175,7 +212,23 @@ def main():
         use_chexbert=not args.no_chexbert,
         device=args.device,
         batch_size=args.batch_size,
+        # Translation settings
+        source_language=args.source_lang,
+        target_language=args.target_lang,
+        enable_translation=not args.no_translation,
+        translation_cache_dir=args.translation_cache_dir,
+        save_translations=not args.no_save_translations,
     )
+    
+    # Print translation settings
+    if config.enable_translation:
+        print(f"\nCross-lingual evaluation enabled:")
+        print(f"  Model predictions: {config.source_language.upper()}")
+        print(f"  Reference reports: {config.target_language.upper()}")
+        print(f"  Predictions will be translated: {config.source_language.upper()} → {config.target_language.upper()}")
+        print(f"  References will be translated: {config.target_language.upper()} → {config.source_language.upper()} (for CheXbert)")
+    else:
+        print(f"\nTranslation disabled - assuming same language for predictions and references")
     
     # Create runner
     runner = EvaluationRunner(config)
